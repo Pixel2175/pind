@@ -7,9 +7,9 @@ env_cmd="$1"
 pgrep -x "pindd" >/dev/null 2>&1 && $env_cmd pkill -x "pindd" >/dev/null 2>&1
 
 if [ "$env_cmd" = "doas" ]; then
-    exec doas -u root env $(printenv | tr '\n' '\0' | xargs -0 -I{} echo "{}") pindd "$USER"
+    exec doas -u root env $(printenv | grep -v "'" | tr '\n' '\0' | xargs -0 -I{} echo "{}") pindd "$USER"
 elif [ "$env_cmd" = "sudo" ]; then
     exec sudo -E env pindd "$USER"
 else
-    exec "$env_cmd" env $(printenv | sed 's/^/-e /' | tr '\n' ' ') pindd "$USER"
+    exec "$env_cmd" pindd "$USER"
 fi

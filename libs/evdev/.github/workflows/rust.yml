@@ -1,0 +1,89 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Format
+      run: cargo fmt --check
+    - name: Clippy
+      run: cargo clippy && cargo clippy --all-features
+    - name: Build
+      run: cargo build --verbose --all-features
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Doc
+      run: cargo doc --all-features
+    - name: Run device tests
+      run: sudo -E env "PATH=$PATH" cargo test --tests --features device-test
+
+  cross-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+        - arch: 'aarch64'
+          rust: 'aarch64-unknown-linux-gnu'
+          os: 'aarch64-linux-gnu'
+        - arch: 'arm'
+          rust: 'armv7-unknown-linux-gnueabihf'
+          os: 'arm-linux-gnueabihf'
+        - arch: 'i386'
+          rust: 'i686-unknown-linux-gnu'
+          os: 'i686-linux-gnu'
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy
+        target: ${{ matrix.target.rust }}
+    - name: Install QEMU and toolchain
+      run: |
+        sudo apt update
+        sudo apt -y install qemu-user qemu-user-static gcc-${{ matrix.target.os }} binutils-${{ matrix.target.os }} binutils-${{ matrix.target.os }}-dbg
+    - name: Append .cargo config
+      run: |
+        echo "[target.${{ matrix.target.rust }}]" >> ~/.cargo/config
+        echo "runner = \"qemu-${{ matrix.target.arch }} -L /usr/${{ matrix.target.os }}/\"" >> ~/.cargo/config
+        echo "linker = \"${{ matrix.target.os }}-gcc\"" >> ~/.cargo/config
+    - name: Build
+      run: cargo build --target ${{ matrix.target.rust }}
+    - name: Run tests
+      run: cargo test --target ${{ matrix.target.rust }}
+    - name: Doc
+      run: cargo doc --target ${{ matrix.target.rust }}
+
+  freebsd:
+    runs-on: ubuntu-latest
+    name: build (FreeBSD)
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      uses: vmactions/freebsd-vm@v1
+      with:
+        envs: 'RUSTFLAGS'
+        usesh: true
+        prepare: |
+          pkg install -y curl
+
+        run: |
+          curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal -y
+          . "$HOME/.cargo/env"
+          cargo build --all-features
+          cargo test

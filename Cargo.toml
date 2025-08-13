@@ -1,0 +1,11 @@
+[package]
+name = "pind"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+evdev = {path = "libs/evdev" } 
+
+[[bin]]
+name = "pindd"
+path = "src/main.rs" 

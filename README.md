@@ -36,7 +36,8 @@ make uninstall
 ```bash 
 pindc <doas|sudo|etc>
 ```
-
+to restart it just run the command again
+it will kill the first process and run it again
 
 ## Config
 the default config path is in ```/etc/pind/pindrc```.

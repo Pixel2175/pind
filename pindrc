@@ -1,8 +1,8 @@
-CSU :   doas light -A 10 ; notify-send "Light" "Light Up %$(light)"
+CSU : light -A 10 ; notify-send "Light" "Light Up %$(light)"
 CSD :   doas light -U 10 ; notify-send "Light" "Light Down %$(light)"
 Mu  :   set file (ls ~/learn/book | wmenu); and test -n "$file"; and zathura ~/learn/book/"$file"
 CSR :   pactl set-sink-volume @DEFAULT_SINK@ +10% ; notify-send "Sound" "Volume Up %$(pamixer --get-volume)"
 CSL :   pactl set-sink-volume @DEFAULT_SINK@ -10% ; notify-send "Sound" "Volume Down %$(pamixer --get-volume)"
 CSw :   walrs -i ~/.config/wallpaper
-CSm :   grim -g "$(slurp)" - | wl-copy && pino --title "Screenshot" --message "The screenshot is copied to clipboard"
+CSm :   grim -g "$(slurp)" - | wl-copy && notify-send "Screenshot" "The screenshot is copied to clipboard"
 CSh :   foot

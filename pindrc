@@ -1,13 +1,8 @@
-# should every binding take one only line 
-# key : command
-CSU :   doas light -A 10 ; notify-send "Light"  "Light Up %$(light)"
-CSD :   doas light -U 10 ; notify-send "Light"  "Light Down %$(light)"
-Mu  :   set file (ls ~/learn/book | dmenu); and test -n "$file"; and zathura ~/learn/book/"$file"
-CSR :   pactl set-sink-volume @DEFAULT_SINK@ +10% ; notify-send "Sound"  "Volume Up %$(pamixer --get-volume)"
-CSL :   pactl set-sink-volume @DEFAULT_SINK@ -10% ; notify-send "Sound"  "Volume Down %$(pamixer --get-volume)"
+CSU :   doas light -A 10 ; notify-send "Light" "Light Up %$(light)"
+CSD :   doas light -U 10 ; notify-send "Light" "Light Down %$(light)"
+Mu  :   set file (ls ~/learn/book | wmenu); and test -n "$file"; and zathura ~/learn/book/"$file"
+CSR :   pactl set-sink-volume @DEFAULT_SINK@ +10% ; notify-send "Sound" "Volume Up %$(pamixer --get-volume)"
+CSL :   pactl set-sink-volume @DEFAULT_SINK@ -10% ; notify-send "Sound" "Volume Down %$(pamixer --get-volume)"
 CSw :   walrs -i ~/.config/wallpaper
-CSm :   maim -s -o | xclip -selection clipboard -t image/png && pino --title "Screenshot" -essage "The screenshot is copied to clipboard"
-CSp :   pkill -x pino
-CSj :   xdg-open /home/pixel/soft/web/japan/indexx.html
-CSi :   rm $(cat ~/.cache/wal/wal)
+CSm :   grim -g "$(slurp)" - | wl-copy && pino --title "Screenshot" --message "The screenshot is copied to clipboard"
 CSh :   foot

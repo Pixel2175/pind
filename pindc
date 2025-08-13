@@ -2,9 +2,9 @@
 # Pixel 2025
 # https://pi66.xyz/pind | github:pixel2175/pind 
 # this script runs the daemon with the client env
-
 env_cmd="$1"
-[ -z "$env_cmd" ] && env_cmd="env"
+[ -z "$env_cmd" ] && env_cmd="sudo"
+pgrep -x "pindd" >/dev/null 2>&1 && $env_cmd pkill -x "pindd" >/dev/null 2>&1
 
 if [ "$env_cmd" = "doas" ]; then
     exec doas -u root env $(printenv | tr '\n' '\0' | xargs -0 -I{} echo "{}") pindd "$USER"

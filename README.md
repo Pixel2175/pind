@@ -31,6 +31,13 @@ make install
 make uninstall
 ```
 
+## How to use
+- Run it 
+```bash 
+pindc <doas|sudo|etc>
+```
+
+
 ## Config
 the default config path is in ```/etc/pind/pindrc```.
 check the pindrc file for more info.

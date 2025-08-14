@@ -165,7 +165,7 @@ fn load_config(config:&str) -> Vec<(AttributeSet<KeyCode>, String)>
         exit(1)
     });
     for line in content.lines() {
-        if !line.starts_with("#") || line.trim().is_empty() {
+        if !line.starts_with("#") && !line.trim().is_empty() {
             let mut l = line.splitn(2, ":");
             let key = l
                 .next()

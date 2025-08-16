@@ -129,10 +129,8 @@ fn is_keyboard(path: &PathBuf) -> bool
 {
     let dev = Device::open(path).unwrap();
     if let Some(keys) = dev.supported_keys() {
-        if dev.name().unwrap().to_lowercase().contains("keyboard"){
-            if keys.contains(KeyCode::KEY_A) && keys.contains(KeyCode::KEY_ENTER) {
-                return true;
-            }
+        if keys.contains(KeyCode::KEY_A) && keys.contains(KeyCode::KEY_ENTER) {
+            return true;
         }
     }
     false
@@ -141,16 +139,10 @@ fn is_keyboard(path: &PathBuf) -> bool
 fn keyboards() -> Vec<PathBuf> 
 {
     let mut devices: Vec<PathBuf> = vec![];
-    let mut sn = Vec::new();
 
     for (path, _) in enumerate() {
         if is_keyboard(&path) {
-            let dev = Device::open(&path).unwrap();
-            let name = dev.name().unwrap_or("unknown").to_string();
-            if !sn.contains(&name) {
-                devices.push(path.clone());
-                sn.push(name);
-            }
+            devices.push(path);
         }
     }
     devices

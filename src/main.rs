@@ -46,7 +46,7 @@ fn run(command: &str,  user: &str)
         .arg(&shell)
         .arg("-c")
         .arg(command)
-        .stdin(Stdio::null())
+        // .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn().unwrap_or_else(|e| {

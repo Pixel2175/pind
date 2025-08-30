@@ -26,36 +26,38 @@
 
 
 use evdev::{AttributeSet, Device, KeyCode, enumerate};
-use std::{env::{var,args},fs::read_to_string, path::PathBuf, process::{exit,Command, Stdio}, thread, time::Duration};
+use std::{env::{var,args},fs::read_to_string, path::PathBuf, process::{exit,Command, Stdio}, sync::{Arc, OnceLock}, thread, time::Duration};
 
 const DELAY  :u64  =  25; // 25ms
 const CONFIG :&str =  "/etc/pind/pindrc";
 
-fn error(title: &str, message: &str) 
+static BINDINGS: OnceLock<Arc<Vec<(AttributeSet<KeyCode>, String)>>> = OnceLock::new();
+
+fn get_bindings() -> Arc<Vec<(AttributeSet<KeyCode>, String)>>
 {
-    println!("[\x1b[33mE\x1b[0m] \x1b[31m{title}:\x1b[0m {message}.");
+    BINDINGS.get_or_init(|| Arc::new(load_config(CONFIG))).clone()
 }
 
-fn run(command: &str,  user: &str) 
+fn error(title: &str, message: &str) -> !
 {
-    let shell = var("SHELL").unwrap_or_else(|_| "sh".to_string());
+    eprintln!("[\x1b[33mE\x1b[0m] \x1b[31m{title}:\x1b[0m {message}.");
+    exit(1)
+}
+
+fn run(command: &str, user: &str)
+{
+    let shell = var("SHELL").unwrap_or_else(|_| "sh".into());
+    
     Command::new("runuser")
-        .arg("-u")
-        .arg(user)
-        .arg("--")
-        .arg(&shell)
-        .arg("-c")
-        .arg(command)
-        // .stdin(Stdio::null())
+        .args(["-u", user, "--", &shell, "-c", command])
+        .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .spawn().unwrap_or_else(|e| {
-            error("Command error: {}", &e.to_string());
-            exit(1);
-        });
+        .spawn()
+        .unwrap_or_else(|e| error("Command execution failed", &e.to_string()));
 }
 
-fn key_to_keycode(input: String) -> AttributeSet<KeyCode> 
+fn key_to_keycode(input: &str) -> AttributeSet<KeyCode> 
 {
     let mut attribute_set = AttributeSet::new();
 
@@ -125,71 +127,39 @@ fn key_to_keycode(input: String) -> AttributeSet<KeyCode>
     attribute_set
 }
 
-fn is_keyboard(path: &PathBuf) -> bool 
+fn keyboards() -> Vec<PathBuf>
 {
-    let dev = Device::open(path).unwrap();
-    if let Some(keys) = dev.supported_keys() {
-        if keys.contains(KeyCode::KEY_A) && keys.contains(KeyCode::KEY_ENTER) {
-            return true;
-        }
-    }
-    false
+    enumerate().filter_map(|(path, dev)| {
+        dev.supported_keys()
+            .filter(|keys| keys.contains(KeyCode::KEY_A) && keys.contains(KeyCode::KEY_ENTER))
+            .map(|_| path)
+    })
+    .collect()
 }
 
-fn keyboards() -> Vec<PathBuf> 
+fn load_config(config: &str) -> Vec<(AttributeSet<KeyCode>, String)>
 {
-    let mut devices: Vec<PathBuf> = vec![];
-
-    for (path, _) in enumerate() {
-        if is_keyboard(&path) {
-            devices.push(path);
-        }
-    }
-    devices
+    let content = read_to_string(config)
+        .unwrap_or_else(|e| error("Config file read failed", &e.to_string()));
+    
+    content.lines()
+        .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
+        .filter_map(|line| {
+            let mut parts = line.splitn(2, ':');
+            let key = parts.next()?.trim();
+            let cmd = parts.next()?.trim();
+            Some((key_to_keycode(key), cmd.to_string()))
+        })
+        .collect()
 }
 
-
-fn load_config(config:&str) -> Vec<(AttributeSet<KeyCode>, String)> 
+fn read_keys(bindings: &[(AttributeSet<KeyCode>, String)], device_path: PathBuf, delay: u64, user: String)
 {
-    let mut binding: Vec<(AttributeSet<KeyCode>, String)> = vec![];
-    let content = read_to_string(config).unwrap_or_else(|e| {
-        error("config file", &e.to_string());
-        exit(1)
-    });
-    for line in content.lines() {
-        if !line.starts_with("#") && !line.trim().is_empty() {
-            let mut l = line.splitn(2, ":");
-            let key = l
-                .next()
-                .unwrap_or_else(|| {
-                    error("Binding", "missing key");
-                    exit(1)
-                })
-                .to_string();
-            let cmd = l
-                .next()
-                .unwrap_or_else(|| {
-                    error("Binding", "missing command");
-                    exit(1)
-                })
-                .to_string();
-            binding.push((key_to_keycode(key), cmd));
-        }
-    }
-    binding
-}
-
-fn read_keys(kc: &Vec<(AttributeSet<KeyCode>, String)>, kbs: PathBuf,delay:u64,user:String) 
-{
-    let dev = Device::open(kbs).unwrap();
-    let mut pressed = AttributeSet::new();
-
-    while let Ok(event) = dev.get_key_state() {
-        if event != pressed {
-            pressed = event.clone();
-            for (key, cmd) in kc {
-                if event == *key {
-                    run(&cmd, &user);
+    loop {
+        if let Ok(dev) = Device::open(&device_path).and_then(|d| d.get_key_state()) {
+            for (key, cmd) in bindings {
+                if dev == *key {
+                    run(cmd, &user);
                 }
             }
         }
@@ -199,24 +169,32 @@ fn read_keys(kc: &Vec<(AttributeSet<KeyCode>, String)>, kbs: PathBuf,delay:u64,u
 
 fn main()
 {
-    let user = args().nth(1).unwrap_or_else(||{error("USER", "add your username in $USER");exit(1)});
-
-    let binding = load_config(CONFIG);
-    if binding.is_empty() {
-        error("Binding", "no binding detected");
+    let user = args().nth(1).unwrap_or_else(|| error("USER", "Username argument required"));
+    
+    let bindings = get_bindings();
+    if bindings.is_empty() {
+        error("binding", "No key bindings detected");
     }
+    
     let keyboards = keyboards();
     if keyboards.is_empty() {
-        error("Keyboard", "no keyboard detected");
+        error("Hardware", "No keyboards detected");
     }
 
-    for keyboard in keyboards {
-        let bind  = binding.clone();
-        let user_ = user.clone(); 
-        let _ = std::thread::spawn(move || {
-            read_keys(&bind, keyboard, DELAY, user_);
-        });
+    // Use a single Arc and share references
+    let handles: Vec<_> = keyboards.into_iter()
+        .map(|keyboard| {
+            let bindings_ref = Arc::clone(&bindings);
+            let user_ref = user.clone();
+            
+            thread::spawn(move || {
+                let bindings_slice: &[(AttributeSet<KeyCode>, String)] = &bindings_ref;
+                read_keys(bindings_slice, keyboard, DELAY, user_ref);
+            })
+        })
+        .collect();
+    
+    for handle in handles {
+        handle.join().unwrap_or_else(|_| error("Thread", "Keyboard thread panicked"));
     }
-
-    std::thread::park();
 }

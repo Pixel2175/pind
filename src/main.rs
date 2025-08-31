@@ -26,11 +26,10 @@
 
 
 use evdev::{AttributeSet, Device, KeyCode, enumerate};
-use std::{env::{var,args},fs::read_to_string, path::PathBuf, process::{exit,Command, Stdio}, sync::{Arc, OnceLock}, thread, time::Duration};
+use std::{env::{var,args},fs::read_to_string, path::PathBuf, process::{exit,Command, Stdio}, sync::{Arc, OnceLock}, thread};
 
 const DELAY  :u64  =  25; // 25ms
 const CONFIG :&str =  "/etc/pind/pindrc";
-
 static BINDINGS: OnceLock<Arc<Vec<(AttributeSet<KeyCode>, String)>>> = OnceLock::new();
 
 fn get_bindings() -> Arc<Vec<(AttributeSet<KeyCode>, String)>>
@@ -153,46 +152,48 @@ fn load_config(config: &str) -> Vec<(AttributeSet<KeyCode>, String)>
         .collect()
 }
 
-fn read_keys(bindings: &[(AttributeSet<KeyCode>, String)], device_path: PathBuf, delay: u64, user: String)
-{
+fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, user: String) {
+    let mut state: Vec<(u64, u64)> = vec![(0, 0); kc.len()];
+    let mut tick = 1;
+    let init = (220 + delay - 1) / delay;
+
     loop {
-        if let Ok(dev) = Device::open(&device_path).and_then(|d| d.get_key_state()) {
-            for (key, cmd) in bindings {
-                if dev == *key {
-                    run(cmd, &user);
+        if let Ok(keys) = Device::open(&kbs).and_then(|d| d.get_key_state()) {
+            for (i, (combo, cmd)) in kc.iter().enumerate() {
+                let pressed = combo.iter().all(|k| keys.contains(k));
+                let (since, last) = &mut state[i];
+                if pressed {
+                    if *since == 0 {
+                        run(cmd, &user);
+                        *since = tick;
+                        *last = tick;
+                    } else if tick - *since >= init && tick > *last {
+                        run(cmd, &user);
+                        *last = tick;
+                    }
+                } else {
+                    *since = 0;
                 }
             }
         }
-        thread::sleep(Duration::from_millis(delay));
+        thread::sleep(std::time::Duration::from_millis(delay));
+        tick = tick.wrapping_add(1);
     }
 }
 
 fn main()
 {
     let user = args().nth(1).unwrap_or_else(|| error("USER", "Username argument required"));
-    
     let bindings = get_bindings();
-    if bindings.is_empty() {
-        error("binding", "No key bindings detected");
-    }
-    
+    if bindings.is_empty() { error("binding", "No key bindings detected"); }
     let keyboards = keyboards();
-    if keyboards.is_empty() {
-        error("Hardware", "No keyboards detected");
-    }
+    if keyboards.is_empty() { error("Hardware", "No keyboards detected"); }
 
-    // Use a single Arc and share references
-    let handles: Vec<_> = keyboards.into_iter()
-        .map(|keyboard| {
-            let bindings_ref = Arc::clone(&bindings);
-            let user_ref = user.clone();
-            
-            thread::spawn(move || {
-                let bindings_slice: &[(AttributeSet<KeyCode>, String)] = &bindings_ref;
-                read_keys(bindings_slice, keyboard, DELAY, user_ref);
-            })
-        })
-        .collect();
+    let handles: Vec<_> = keyboards.into_iter().map(|keyboard| {
+        let bindings_ref = Arc::clone(&bindings);
+        let user_ref = user.clone();
+        thread::spawn(move || read_keys(&bindings_ref, keyboard, DELAY, user_ref))
+    }).collect();
     
     for handle in handles {
         handle.join().unwrap_or_else(|_| error("Thread", "Keyboard thread panicked"));

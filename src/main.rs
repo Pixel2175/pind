@@ -152,10 +152,11 @@ fn load_config(config: &str) -> Vec<(AttributeSet<KeyCode>, String)>
         .collect()
 }
 
-fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, user: String) {
+fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, user: String)
+{
     let mut state: Vec<(u64, u64)> = vec![(0, 0); kc.len()];
     let mut tick = 1;
-    let init = (220 + delay - 1) / delay;
+    let init = (320 + delay - 1) / delay;
 
     loop {
         if let Ok(keys) = Device::open(&kbs).and_then(|d| d.get_key_state()) {

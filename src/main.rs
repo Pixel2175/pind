@@ -26,11 +26,11 @@
 
 
 use evdev::{AttributeSet, Device, KeyCode, enumerate};
-use std::{env::{var,args},fs::{read_to_string,canonicalize}, path::PathBuf, process::{exit,Command, Stdio}, sync::{Arc, OnceLock}, thread};
+use std::{env::{var,args},fs::read_to_string, path::PathBuf, process::{exit,Command, Stdio}, sync::{Arc, OnceLock}, thread};
 
 const DELAY  :u64  =  25; // 25ms
-const CONFIG :&str =  "/etc/pind/pindrc"; // You can use ~/ for user path
-                                          // like ~/.config/pind/pindrc
+const CONFIG :&str = "~/.config/pind/pindrc"; // path cfg
+
 static BINDINGS: OnceLock<Arc<Vec<(AttributeSet<KeyCode>, String)>>> = OnceLock::new();
 
 fn get_bindings() -> Arc<Vec<(AttributeSet<KeyCode>, String)>>
@@ -139,8 +139,10 @@ fn keyboards() -> Vec<PathBuf>
 
 fn load_config(config: &str) -> Vec<(AttributeSet<KeyCode>, String)>
 {
-    let content = read_to_string(canonicalize(PathBuf::from(config.replace("~",&var("HOME").unwrap_or_default()))).unwrap_or_else(|e|{error("config",&e.to_string())}))
-        .unwrap_or_else(|e| error("Config file read failed", &e.to_string()));
+    let config_path = config.replace("~", &var("HOME").unwrap_or_default());
+    
+    let content = read_to_string(PathBuf::from(&config_path))
+        .unwrap_or_else(|e| error("CONFIG", &e.to_string()));
     
     content.lines()
         .filter(|line| !line.starts_with('#') && !line.trim().is_empty())

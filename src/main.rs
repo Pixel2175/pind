@@ -5,15 +5,14 @@
 //
 // Features:
 // - Supports modifier keys (Ctrl, Shift, Alt, Meta) and common keys.
-// - Loads key bindings from a configuration file (/etc/pind/pindrc).
+// - Loads key bindings from a configuration file (~/.config/pind/pindrc).
 // - Runs commands as a specified user using `runuser`.
 // - Detects multiple keyboards and avoids duplicates.
 // - Non-blocking key polling with a configurable delay (25ms by default).
 //
 // Usage:
-//   sudo ./pind [optional:user]   # user argument specifies which user to run commands as
-//
-// Config file format (/etc/pind/pindrc):
+//   sudo ./pindc   # automatically uses current user to run commands
+// Config file format (~/.config/pind/pindrc):
 //   # Lines starting with '#' are comments
 //   <key_combination>:<command>
 //   Example:

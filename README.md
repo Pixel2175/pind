@@ -40,7 +40,7 @@ to restart it just run the command again
 it will kill the first process and run it again
 
 ## Config
-the default config path is in ```/etc/pind/pindrc```.
+the default config path is in ```~/.config/pind/pindrc```.
 check the pindrc file for more info.
 
 **Config example:**

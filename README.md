@@ -113,6 +113,3 @@ There are **two executables**:
 * **pindc**: Pind Client
   Captures the user’s environment variables and passes them to `pindd`.
   This allows root daemon processes to still access the user environment (paths, `XDG_RUNTIME_DIR`, etc).
-
-```
-```

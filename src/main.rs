@@ -27,7 +27,7 @@ use evdev::{AttributeSet, Device, KeyCode, enumerate, EventType, uinput::Virtual
 use std::{env::{var,args},fs::{read_to_string,canonicalize}, path::PathBuf, process::{exit,Command, Stdio}, sync::{Arc, OnceLock}, thread};
 
 const DELAY  :u64  =  25; // 25ms
-const CONFIG :&str =  "~/etc/pind/pindrc"; // You can use ~/ for user path
+const CONFIG :&str =  "/etc/pind/pindrc"; // You can use ~/ for user path
                                           // like ~/.config/pind/pindrc
 static BINDINGS: OnceLock<Arc<Vec<(AttributeSet<KeyCode>, String)>>> = OnceLock::new();
 
@@ -168,7 +168,7 @@ fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, u
     // First, get all supported keys from the physical device to set up the virtual device properly
     let supported_keys = match device.supported_keys() {
         Some(keys) => keys,
-        None => {
+        _ => {
             eprintln!("Failed to get supported keys from device");
             return;
         }
@@ -253,13 +253,12 @@ fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, u
                         let (since, last) = &mut state[i];
                         if pressed {
                             if *since == 0 {
-                                run(cmd, &user);
                                 *since = tick;
                                 *last = tick;
                             } else if tick - *since >= init && tick > *last {
-                                run(cmd, &user);
                                 *last = tick;
                             }
+                            run(cmd, &user);
                         } else {
                             *since = 0;
                         }

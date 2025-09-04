@@ -1,133 +1,119 @@
-## Pixel HotKey Binding (Pind)
-when i switch from x11 to wayland i ran into some problems. one of them is Hotkey binding apps like sxhkd,i tried swhkd, but its shit (sorry) 
+````markdown
+# Pind
 
-## Waybind
-so i some research and found a project called [Waybind](https://github.com/postman721/Waybind/issues)
-this is a masterpiece but there are some problems:
-- written in python (not a big problem but i prefer one written in low-level lang :)
-- only support CTRL ,Alt and Suport Keys.
-- can't detect the user ENV.
+## About
+When I switched from X11 to Wayland, I ran into problems with hotkey binding apps like `sxhkd`. I tried `swhkd`, but it wasn’t good enough.  
+After testing [Waybind](https://github.com/postman721/Waybind/issues), I decided to build my own minimal hotkey daemon in **Rust**: **Pind**.
 
-
-# Pind 
-so now im going to talk more about Pind and how to use it
-
-## Pind Features 
-- written in Rust 
-- support almost all keyboard Keys (i will add more in the future).
-- minimal as posible (~230 line of code )
+## Features
+- Written in Rust
+- Supports almost all keyboard keys
+- Minimal as possible (~230 lines of code)
+- Works with Wayland and X11 environments
 
 ## Installation
-to install it you just need to run this commands
-> **⚠️ Warning:** You need to run it without sudo.
+> **⚠️ Warning:** Run without `sudo`.
 
-- install:
 ```bash
 make install
-```
+````
 
-- uninstall:
+Uninstall:
+
 ```bash
 make uninstall
 ```
 
-## How to use
-- Run it 
-```bash 
+## Usage
+
+Run:
+
+```bash
 pindc <doas|sudo|etc>
 ```
-to restart it just run the command again
-it will kill the first process and run it again
+
+To restart, just run the command again (it kills the old process).
 
 ## Config
-the default config path is in ```/etc/pind/pindrc```.
-check the pindrc file for more info.
 
-**Config example:**
+The config file is located at:
+
 ```
-# Ctrl + Shift + a
-CSa : doas light -A 10 ; pino -t "Light" -m "Light Up %$(light)"
+~/.config/pind/pindrc
+```
 
-# Ctrl + Shift + Down Key
-CSd : doas light -U 10 ; pino -t "Light" -m "Light Down %$(light)"
+### Config Example
 
-# its ok if you want to use it like this
-C + S +w :   walrs -i ~/.config/wallpaper
+```bash
+# Ctrl + Shift + Up
+ctrl + shift + up => light -A 10 ; notify-send "Light" "Light Up %$(light)"
 
+# Ctrl + Shift + Down
+ctrl_left + shift + down => doas light -U 10 ; notify-send "Light" "Light Down %$(light)"
+
+# Meta + a
+meta_right + a => set file (ls ~/learn/book | wmenu); and test -n "$file"; and zathura ~/learn/book/"$file"
+
+# Volume Up
+ctrl_left + shift_right + right => pactl set-sink-volume @DEFAULT_SINK@ +10% ; notify-send "Sound" "Volume Up %$(pamixer --get-volume)"
+
+# Volume Down
+ctrl + shift + left => pactl set-sink-volume @DEFAULT_SINK@ -10% ; notify-send "Sound" "Volume Down %$(pamixer --get-volume)"
 ```
 
 ## Key Symbol Table
 
-| **Key**    | **Symbol** |
-|------------|------------|
-| Ctrl       | C          |
-| Alt        | A          |
-| Shift      | S          |
-| Meta       | M          |
-| CapsLock   | K          |
-| Tab        | T          |
-| Enter      | E          |
-| Up         | U          |
-| Down       | D          |
-| Left       | L          |
-| Right      | R          |
-| Slash      | /          |
-| Backslash  | \          |
-| 0          | 0          |
-| 1          | 1          |
-| 2          | 2          |
-| 3          | 3          |
-| 4          | 4          |
-| 5          | 5          |
-| 6          | 6          |
-| 7          | 7          |
-| 8          | 8          |
-| 9          | 9          |
-| A          | a          |
-| B          | b          |
-| C          | c          |
-| D          | d          |
-| E          | e          |
-| F          | f          |
-| G          | g          |
-| H          | h          |
-| I          | i          |
-| J          | j          |
-| K          | k          |
-| L          | l          |
-| M          | m          |
-| N          | n          |
-| O          | o          |
-| P          | p          |
-| Q          | q          |
-| R          | r          |
-| S          | s          |
-| T          | t          |
-| U          | u          |
-| V          | v          |
-| W          | w          |
-| X          | x          |
-| Y          | y          |
-| Z          | z          |
-| Dot        | .          |
-| Comma      | ,          |
-| Semicolon  | ;          |
-| Apostrophe | '          |
-| LeftBrace  | [          |
-| RightBrace | ]          |
-| Minus      | -          |
-| Equal      | =          |
-| Grave      | `          |
+| **Key**     | **Symbol(s)**              |
+| ----------- | -------------------------- |
+| Ctrl Left   | ctrl, ctrl_left           |
+| Ctrl Right  | ctrl_right                |
+| Shift Left  | shift, shift_left         |
+| Shift Right | shift_right               |
+| Alt Left    | alt, alt_left             |
+| Alt Right   | alt_right                 |
+| Meta Left   | meta, meta_left           |
+| Meta Right  | meta_right                |
+| CapsLock    | capslock                   |
+| Tab         | tab                        |
+| Enter       | enter, return              |
+| Esc         | esc                        |
+| Space       | space                      |
+| Up          | up                         |
+| Down        | down                       |
+| Left        | left                       |
+| Right       | right                      |
+| Backslash   | , back_slash              |
+| Slash       | /, slash                   |
+| Dot         | ., dot                     |
+| Comma       | ,, comma                   |
+| Semicolon   | ;, semicolon               |
+| Apostrophe  | ', apostrophe              |
+| Left Brace  | [, leftbrace              |
+| Right Brace | ], rightbrace              |
+| Minus       | -, minus                   |
+| Equal       | =, equal                   |
+| Grave       | \`, grave                  |
+| NumLock     | numlock                    |
+| ScrollLock  | scroll_lock               |
+| 0–9         | 0,1,2,...,9                |
+| A–Z         | a–z                        |
+| F1–F12      | f1–f12                     |
+| KP0–KP9     | kp0–kp9, keypad_0–9       |
+| KP Dot      | kpdot, keypad_dot         |
+| KP Minus    | kpminus, keypad_minus     |
 
+## How it Works
 
-## How does this app work 
-there is 2 executable files 
-- **pindd**: Pind-Daemon
-This is the daemon where all the main functionality happens.
-It opens ```/dev/input/eventX``` devices and filters for keyboards.
-Then, it creates threads for each keyboard device to start listening for key presses. If the keys pressed match those in the config, it will run the corresponding command.
+There are **two executables**:
 
-- **pindc**: Pind-Client
-Since pindd needs root privileges to run, it cannot access the user environment directly.
-That’s where pindc comes in — it captures the user’s environment variables and passes them to pindd running as root.
-This means all user environment variables, such as XDG_RUNTIME_DIR, paths, and other information, are sent to the daemon.
+* **pindd**: Pind Daemon
+  Runs as root, opens `/dev/input/eventX`, and listens for key presses.
+  If the pressed keys match the config, it runs the mapped command.
+  If the pressed keys don't match the config, it uses `uinput` to pass the key event to the focused client.
+
+* **pindc**: Pind Client
+  Captures the user’s environment variables and passes them to `pindd`.
+  This allows root daemon processes to still access the user environment (paths, `XDG_RUNTIME_DIR`, etc).
+
+```
+```

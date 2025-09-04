@@ -1,36 +1,10 @@
-// pind - A simple keyboard shortcut runner in Rust
-// 
-// This program reads key events from all connected keyboards and executes
-// configured shell commands when a matching key combination is pressed.
-//
-// Features:
-// - Supports modifier keys (Ctrl, Shift, Alt, Meta) and common keys.
-// - Loads key bindings from a configuration file (/etc/pind/pindrc).
-// - Runs commands as a specified user using `runuser`.
-// - Detects multiple keyboards and avoids duplicates.
-// - Non-blocking key polling with a configurable delay (25ms by default).
-//
-// Usage:
-//   sudo ./pind [optional:user]   # user argument specifies which user to run commands as
-//
-// Config file format (/etc/pind/pindrc):
-//   # Lines starting with '#' are comments
-//   <key_combination>:<command>
-//   Example:
-//     C+E:echo "Ctrl+Enter pressed"
-//
-// Dependencies:
-// - evdev crate for reading keyboard input
-// - std for filesystem, environment, threading, and process handling
-
 use evdev::{AttributeSet, Device, KeyCode, enumerate, EventType, uinput::VirtualDevice};
 use std::{env::{var,args},fs::{read_to_string,canonicalize}, path::PathBuf, process::{exit,Command, Stdio}, sync::{Arc, OnceLock}, thread};
 
 const DELAY  :u64  =  25; // 25ms
-const CONFIG :&str =  "/etc/pind/pindrc"; // You can use ~/ for user path
-                                          // like ~/.config/pind/pindrc
-static BINDINGS: OnceLock<Arc<Vec<(AttributeSet<KeyCode>, String)>>> = OnceLock::new();
+const CONFIG :&str =  "~/.config/pind/pindrc";
 
+static BINDINGS: OnceLock<Arc<Vec<(AttributeSet<KeyCode>, String)>>> = OnceLock::new();
 
 fn get_bindings() -> Arc<Vec<(AttributeSet<KeyCode>, String)>>
 {
@@ -46,7 +20,6 @@ fn error(title: &str, message: &str) -> !
 fn run(command: &str, user: &str)
 {
     let shell = var("SHELL").unwrap_or_else(|_| "sh".into());
-    
     Command::new("runuser")
         .args(["-u", user, "--", &shell, "-c", command])
         .stdin(Stdio::null())
@@ -60,67 +33,101 @@ fn key_to_keycode(input: &str) -> AttributeSet<KeyCode>
 {
     let mut attribute_set = AttributeSet::new();
 
-    for ch in input.chars() {
-        match ch {
-            'M' => attribute_set.insert(KeyCode::KEY_LEFTMETA),
-            'C' => attribute_set.insert(KeyCode::KEY_LEFTCTRL),
-            'S' => attribute_set.insert(KeyCode::KEY_LEFTSHIFT),
-            'A' => attribute_set.insert(KeyCode::KEY_LEFTALT),
-            'K' => attribute_set.insert(KeyCode::KEY_CAPSLOCK),
-            '/' => attribute_set.insert(KeyCode::KEY_SLASH),
-            '\\'=> attribute_set.insert(KeyCode::KEY_BACKSLASH),
-            'T' => attribute_set.insert(KeyCode::KEY_TAB),
-            'E' => attribute_set.insert(KeyCode::KEY_ENTER),
-            '0' => attribute_set.insert(KeyCode::KEY_0),
-            '1' => attribute_set.insert(KeyCode::KEY_1),
-            '2' => attribute_set.insert(KeyCode::KEY_2),
-            '3' => attribute_set.insert(KeyCode::KEY_3),
-            '4' => attribute_set.insert(KeyCode::KEY_4),
-            '5' => attribute_set.insert(KeyCode::KEY_5),
-            '6' => attribute_set.insert(KeyCode::KEY_6),
-            '7' => attribute_set.insert(KeyCode::KEY_7),
-            '8' => attribute_set.insert(KeyCode::KEY_8),
-            '9' => attribute_set.insert(KeyCode::KEY_9),
-            'a' => attribute_set.insert(KeyCode::KEY_A),
-            'b' => attribute_set.insert(KeyCode::KEY_B),
-            'c' => attribute_set.insert(KeyCode::KEY_C),
-            'd' => attribute_set.insert(KeyCode::KEY_D),
-            'e' => attribute_set.insert(KeyCode::KEY_E),
-            'f' => attribute_set.insert(KeyCode::KEY_F),
-            'g' => attribute_set.insert(KeyCode::KEY_G),
-            'h' => attribute_set.insert(KeyCode::KEY_H),
-            'i' => attribute_set.insert(KeyCode::KEY_I),
-            'j' => attribute_set.insert(KeyCode::KEY_J),
-            'k' => attribute_set.insert(KeyCode::KEY_K),
-            'l' => attribute_set.insert(KeyCode::KEY_L),
-            'm' => attribute_set.insert(KeyCode::KEY_M),
-            'n' => attribute_set.insert(KeyCode::KEY_N),
-            'o' => attribute_set.insert(KeyCode::KEY_O),
-            'p' => attribute_set.insert(KeyCode::KEY_P),
-            'q' => attribute_set.insert(KeyCode::KEY_Q),
-            'r' => attribute_set.insert(KeyCode::KEY_R),
-            's' => attribute_set.insert(KeyCode::KEY_S),
-            't' => attribute_set.insert(KeyCode::KEY_T),
-            'u' => attribute_set.insert(KeyCode::KEY_U),
-            'v' => attribute_set.insert(KeyCode::KEY_V),
-            'w' => attribute_set.insert(KeyCode::KEY_W),
-            'x' => attribute_set.insert(KeyCode::KEY_X),
-            'y' => attribute_set.insert(KeyCode::KEY_Y),
-            'z' => attribute_set.insert(KeyCode::KEY_Z),
-            '.' => attribute_set.insert(KeyCode::KEY_DOT),
-            ',' => attribute_set.insert(KeyCode::KEY_COMMA),
-            ';' => attribute_set.insert(KeyCode::KEY_SEMICOLON),
-            '\''=> attribute_set.insert(KeyCode::KEY_APOSTROPHE),
-            '[' => attribute_set.insert(KeyCode::KEY_LEFTBRACE),
-            ']' => attribute_set.insert(KeyCode::KEY_RIGHTBRACE),
-            '-' => attribute_set.insert(KeyCode::KEY_MINUS),
-            '=' => attribute_set.insert(KeyCode::KEY_EQUAL),
-            '`' => attribute_set.insert(KeyCode::KEY_GRAVE),
-            'U' => attribute_set.insert(KeyCode::KEY_UP),
-            'D' => attribute_set.insert(KeyCode::KEY_DOWN),
-            'L' => attribute_set.insert(KeyCode::KEY_LEFT),
-            'R' => attribute_set.insert(KeyCode::KEY_RIGHT),
-            _ => continue,
+    for key in input.replace(' ',"").split('+')  {
+        match key.to_lowercase().as_str(){
+            "meta_left"  | "meta"  => attribute_set.insert(KeyCode::KEY_LEFTMETA),
+            "ctrl_left"  | "ctrl"  => attribute_set.insert(KeyCode::KEY_LEFTCTRL),
+            "shift_left" | "shift" => attribute_set.insert(KeyCode::KEY_LEFTSHIFT),
+            "alt_left"   | "alt"   => attribute_set.insert(KeyCode::KEY_LEFTALT),
+            "back_slash" | "\\"    => attribute_set.insert(KeyCode::KEY_BACKSLASH),
+            "slash"      | "/"     => attribute_set.insert(KeyCode::KEY_SLASH),
+            "enter"     | "return" => attribute_set.insert(KeyCode::KEY_ENTER),
+            "ctrl_right"  => attribute_set.insert(KeyCode::KEY_RIGHTCTRL),
+            "shift_right" => attribute_set.insert(KeyCode::KEY_RIGHTSHIFT),
+            "meta_right"  => attribute_set.insert(KeyCode::KEY_RIGHTMETA),
+            "alt_right"   => attribute_set.insert(KeyCode::KEY_RIGHTALT),
+            "capslock"    => attribute_set.insert(KeyCode::KEY_CAPSLOCK),
+            "tab" => attribute_set.insert(KeyCode::KEY_TAB),
+            "0" => attribute_set.insert(KeyCode::KEY_0),
+            "1" => attribute_set.insert(KeyCode::KEY_1),
+            "2" => attribute_set.insert(KeyCode::KEY_2),
+            "3" => attribute_set.insert(KeyCode::KEY_3),
+            "4" => attribute_set.insert(KeyCode::KEY_4),
+            "5" => attribute_set.insert(KeyCode::KEY_5),
+            "6" => attribute_set.insert(KeyCode::KEY_6),
+            "7" => attribute_set.insert(KeyCode::KEY_7),
+            "8" => attribute_set.insert(KeyCode::KEY_8),
+            "9" => attribute_set.insert(KeyCode::KEY_9),
+            "a" => attribute_set.insert(KeyCode::KEY_A),
+            "b" => attribute_set.insert(KeyCode::KEY_B),
+            "c" => attribute_set.insert(KeyCode::KEY_C),
+            "d" => attribute_set.insert(KeyCode::KEY_D),
+            "e" => attribute_set.insert(KeyCode::KEY_E),
+            "f" => attribute_set.insert(KeyCode::KEY_F),
+            "g" => attribute_set.insert(KeyCode::KEY_G),
+            "h" => attribute_set.insert(KeyCode::KEY_H),
+            "i" => attribute_set.insert(KeyCode::KEY_I),
+            "j" => attribute_set.insert(KeyCode::KEY_J),
+            "k" => attribute_set.insert(KeyCode::KEY_K),
+            "l" => attribute_set.insert(KeyCode::KEY_L),
+            "m" => attribute_set.insert(KeyCode::KEY_M),
+            "n" => attribute_set.insert(KeyCode::KEY_N),
+            "o" => attribute_set.insert(KeyCode::KEY_O),
+            "p" => attribute_set.insert(KeyCode::KEY_P),
+            "q" => attribute_set.insert(KeyCode::KEY_Q),
+            "r" => attribute_set.insert(KeyCode::KEY_R),
+            "s" => attribute_set.insert(KeyCode::KEY_S),
+            "t" => attribute_set.insert(KeyCode::KEY_T),
+            "u" => attribute_set.insert(KeyCode::KEY_U),
+            "v" => attribute_set.insert(KeyCode::KEY_V),
+            "w" => attribute_set.insert(KeyCode::KEY_W),
+            "x" => attribute_set.insert(KeyCode::KEY_X),
+            "y" => attribute_set.insert(KeyCode::KEY_Y),
+            "z" => attribute_set.insert(KeyCode::KEY_Z),
+            "up"    => attribute_set.insert(KeyCode::KEY_UP),
+            "down"  => attribute_set.insert(KeyCode::KEY_DOWN),
+            "right" => attribute_set.insert(KeyCode::KEY_RIGHT),
+            "left"  => attribute_set.insert(KeyCode::KEY_LEFT),
+            "dot" | "." => attribute_set.insert(KeyCode::KEY_DOT),
+            "comma" | "," => attribute_set.insert(KeyCode::KEY_COMMA),
+            "semicolon"  | ";"  => attribute_set.insert(KeyCode::KEY_SEMICOLON),
+            "apostrophe" | "\"" => attribute_set.insert(KeyCode::KEY_APOSTROPHE),
+            "leftbrace"  | "["  => attribute_set.insert(KeyCode::KEY_LEFTBRACE),
+            "rightbrace" | "]"  => attribute_set.insert(KeyCode::KEY_RIGHTBRACE),
+            "numlock"     => attribute_set.insert(KeyCode::KEY_NUMLOCK),
+            "scroll_lock"  => attribute_set.insert(KeyCode::KEY_SCROLLLOCK),
+            "minus" | "-" => attribute_set.insert(KeyCode::KEY_MINUS),
+            "equal" | "=" => attribute_set.insert(KeyCode::KEY_EQUAL),
+            "plus" => attribute_set.insert(KeyCode::KEY_KPPLUS),
+            "grave" | "`" => attribute_set.insert(KeyCode::KEY_GRAVE),
+            "space" => attribute_set.insert(KeyCode::KEY_SPACE),
+            "esc" => attribute_set.insert(KeyCode::KEY_ESC),
+            "f1"  => attribute_set.insert(KeyCode::KEY_F1),
+            "f2"  => attribute_set.insert(KeyCode::KEY_F2),
+            "f3"  => attribute_set.insert(KeyCode::KEY_F3),
+            "f4"  => attribute_set.insert(KeyCode::KEY_F4),
+            "f5"  => attribute_set.insert(KeyCode::KEY_F5),
+            "f6"  => attribute_set.insert(KeyCode::KEY_F6),
+            "f7"  => attribute_set.insert(KeyCode::KEY_F7),
+            "f8"  => attribute_set.insert(KeyCode::KEY_F8),
+            "f9"  => attribute_set.insert(KeyCode::KEY_F9),
+            "f10" => attribute_set.insert(KeyCode::KEY_F10),
+            "f11" => attribute_set.insert(KeyCode::KEY_F11),
+            "f12" => attribute_set.insert(KeyCode::KEY_F12),
+            "kp0"     | "keypad_0" => attribute_set.insert(KeyCode::KEY_KP0),
+            "kp1"     | "keypad_1" => attribute_set.insert(KeyCode::KEY_KP1),
+            "kp2"     | "keypad_2" => attribute_set.insert(KeyCode::KEY_KP2),
+            "kp3"     | "keypad_3" => attribute_set.insert(KeyCode::KEY_KP3),
+            "kp4"     | "keypad_4" => attribute_set.insert(KeyCode::KEY_KP4),
+            "kp5"     | "keypad_5" => attribute_set.insert(KeyCode::KEY_KP5),
+            "kp6"     | "keypad_6" => attribute_set.insert(KeyCode::KEY_KP6),
+            "kp7"     | "keypad_7" => attribute_set.insert(KeyCode::KEY_KP7),
+            "kp8"     | "keypad_8" => attribute_set.insert(KeyCode::KEY_KP8),
+            "kp9"     | "keypad_9" => attribute_set.insert(KeyCode::KEY_KP9),
+            "kpdot"   | "keypad_dot" => attribute_set.insert(KeyCode::KEY_KPDOT),
+            "kpplus"  | "keypad_plus" => attribute_set.insert(KeyCode::KEY_KPPLUS),
+            "kpminus" | "keypad_minus" => attribute_set.insert(KeyCode::KEY_KPMINUS),
+            _ => {error("Key", &format!("key {} is not exists",key))},
         }
     }
     attribute_set
@@ -144,7 +151,7 @@ fn load_config(config: &str) -> Vec<(AttributeSet<KeyCode>, String)>
     content.lines()
         .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
         .filter_map(|line| {
-            let mut parts = line.splitn(2, ':');
+            let mut parts = line.splitn(2, "=>");
             let key = parts.next()?.trim();
             let cmd = parts.next()?.trim();
             Some((key_to_keycode(key), cmd.to_string()))
@@ -152,7 +159,6 @@ fn load_config(config: &str) -> Vec<(AttributeSet<KeyCode>, String)>
         .collect()
 }
 
-// Modify the read_keys function to properly block shortcut keys
 fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, user: String)
 {
     let mut state: Vec<(u64, u64)> = vec![(0, 0); kc.len()];
@@ -244,12 +250,9 @@ fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, u
                 }
                 
                 if is_shortcut_key && active_shortcut {
-                    // This is a shortcut key and we're in an active shortcut combo
-                    // Process the shortcut but DON'T forward the key event
                     for (i, (combo, cmd)) in kc.iter().enumerate() {
                         // Check if all keys in combo are pressed
                         let pressed = combo.iter().all(|k| current_state.contains(k));
-                        
                         let (since, last) = &mut state[i];
                         if pressed {
                             if *since == 0 {
@@ -264,16 +267,12 @@ fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, u
                         }
                     }
                 } else {
-                    // Forward non-shortcut keys or shortcut keys when not in active combo
                     events_to_forward.push(event);
                 }
             } else {
-                // Forward non-key events (like SYN_REPORT, etc.)
                 events_to_forward.push(event);
             }
         }
-        
-        // Forward non-shortcut events through virtual device
         if !events_to_forward.is_empty() {
             if let Err(e) = virtual_device.emit(&events_to_forward) {
                 eprintln!("Failed to emit events: {}", e);

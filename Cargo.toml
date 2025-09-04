@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2024"
 
 [dependencies]
-evdev = {path = "libs/evdev" } 
+evdev = {path = "libs/evdev", features = ["uinput"] } 
 
 [[bin]]
 name = "pindd"

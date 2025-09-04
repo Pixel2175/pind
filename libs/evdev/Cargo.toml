@@ -13,6 +13,7 @@ rust-version = "1.64"
 serde = ["dep:serde"]
 tokio = ["dep:tokio"]
 stream-trait = ["tokio", "futures-core"]
+uinput = []  # Add this line
 device-test = []
 
 [dependencies]

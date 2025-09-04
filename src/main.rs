@@ -23,15 +23,14 @@
 // - evdev crate for reading keyboard input
 // - std for filesystem, environment, threading, and process handling
 
-
-
-use evdev::{AttributeSet, Device, KeyCode, enumerate};
+use evdev::{AttributeSet, Device, KeyCode, enumerate, EventType, uinput::VirtualDevice};
 use std::{env::{var,args},fs::{read_to_string,canonicalize}, path::PathBuf, process::{exit,Command, Stdio}, sync::{Arc, OnceLock}, thread};
 
 const DELAY  :u64  =  25; // 25ms
-const CONFIG :&str =  "/etc/pind/pindrc"; // You can use ~/ for user path
+const CONFIG :&str =  "~/etc/pind/pindrc"; // You can use ~/ for user path
                                           // like ~/.config/pind/pindrc
 static BINDINGS: OnceLock<Arc<Vec<(AttributeSet<KeyCode>, String)>>> = OnceLock::new();
+
 
 fn get_bindings() -> Arc<Vec<(AttributeSet<KeyCode>, String)>>
 {
@@ -153,31 +152,135 @@ fn load_config(config: &str) -> Vec<(AttributeSet<KeyCode>, String)>
         .collect()
 }
 
+// Modify the read_keys function to properly block shortcut keys
 fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, user: String)
 {
     let mut state: Vec<(u64, u64)> = vec![(0, 0); kc.len()];
     let mut tick = 1;
     let init = (320 + delay - 1) / delay;
+    
+    let mut device = match Device::open(&kbs) {
+        Ok(dev) => dev,
+        Err(_) => return, // Device no longer exists, exit thread
+    };
+    
+    // Create a virtual device to forward non-shortcut keys
+    // First, get all supported keys from the physical device to set up the virtual device properly
+    let supported_keys = match device.supported_keys() {
+        Some(keys) => keys,
+        None => {
+            eprintln!("Failed to get supported keys from device");
+            return;
+        }
+    };
+    
+    let mut virtual_device = match VirtualDevice::builder() {
+        Ok(builder) => builder,
+        Err(e) => {
+            eprintln!("Failed to create virtual device builder: {}", e);
+            return;
+        }
+    };
+    
+    virtual_device = match virtual_device
+        .name("pind-virtual-keyboard")
+        .with_keys(&supported_keys)
+    {
+        Ok(builder) => builder,
+        Err(e) => {
+            eprintln!("Failed to set up virtual device with keys: {}", e);
+            return;
+        }
+    };
+    
+    let mut virtual_device = match virtual_device.build() {
+        Ok(dev) => dev,
+        Err(e) => {
+            eprintln!("Failed to build virtual device: {}", e);
+            return;
+        }
+    };
+    
+    // Grab the physical device to capture all events
+    if let Err(e) = device.grab() {
+        eprintln!("Failed to grab device: {}", e);
+        return;
+    }
 
     loop {
-        if let Ok(keys) = Device::open(&kbs).and_then(|d| d.get_key_state()) {
-            for (i, (combo, cmd)) in kc.iter().enumerate() {
-                let pressed = combo.iter().all(|k| keys.contains(k));
-                let (since, last) = &mut state[i];
-                if pressed {
-                    if *since == 0 {
-                        run(cmd, &user);
-                        *since = tick;
-                        *last = tick;
-                    } else if tick - *since >= init && tick > *last {
-                        run(cmd, &user);
-                        *last = tick;
-                    }
-                } else {
-                    *since = 0;
-                }
+        // Collect events
+        let events: Vec<_> = match device.fetch_events() {
+            Ok(events_iter) => events_iter.collect(),
+            Err(_) => break, // Device no longer exists
+        };
+        
+        let mut events_to_forward = Vec::new();
+        let current_state = match device.get_key_state() {
+            Ok(state) => state,
+            Err(_) => break, // Device no longer exists
+        };
+        
+        // Check if any shortcut is currently active
+        let mut active_shortcut = false;
+        for (combo, _) in kc {
+            // Check if all keys in combo are pressed
+            if combo.iter().all(|k| current_state.contains(k)) {
+                active_shortcut = true;
+                break;
             }
         }
+        
+        for event in events {
+            if event.event_type() == EventType::KEY {
+                let key_code = KeyCode::new(event.code());
+                
+                // Check if this key is part of any shortcut
+                let mut is_shortcut_key = false;
+                for (combo, _) in kc {
+                    if combo.contains(key_code) {
+                        is_shortcut_key = true;
+                        break;
+                    }
+                }
+                
+                if is_shortcut_key && active_shortcut {
+                    // This is a shortcut key and we're in an active shortcut combo
+                    // Process the shortcut but DON'T forward the key event
+                    for (i, (combo, cmd)) in kc.iter().enumerate() {
+                        // Check if all keys in combo are pressed
+                        let pressed = combo.iter().all(|k| current_state.contains(k));
+                        
+                        let (since, last) = &mut state[i];
+                        if pressed {
+                            if *since == 0 {
+                                run(cmd, &user);
+                                *since = tick;
+                                *last = tick;
+                            } else if tick - *since >= init && tick > *last {
+                                run(cmd, &user);
+                                *last = tick;
+                            }
+                        } else {
+                            *since = 0;
+                        }
+                    }
+                } else {
+                    // Forward non-shortcut keys or shortcut keys when not in active combo
+                    events_to_forward.push(event);
+                }
+            } else {
+                // Forward non-key events (like SYN_REPORT, etc.)
+                events_to_forward.push(event);
+            }
+        }
+        
+        // Forward non-shortcut events through virtual device
+        if !events_to_forward.is_empty() {
+            if let Err(e) = virtual_device.emit(&events_to_forward) {
+                eprintln!("Failed to emit events: {}", e);
+            }
+        }
+        
         thread::sleep(std::time::Duration::from_millis(delay));
         tick = tick.wrapping_add(1);
     }

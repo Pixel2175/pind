@@ -12,8 +12,8 @@ install: build
 	sudo cp ./pindc $(INSTALL_DIR)/
 	sudo chmod 755 $(INSTALL_DIR)/pindc
 	sudo chmod 755 $(INSTALL_DIR)/pindd
-	sudo mkdir -p $(CONFIG_DIR)
-	sudo cp -n pindrc $(CONFIG_DIR)
+	mkdir -p $(CONFIG_DIR)
+	cp -n pindrc $(CONFIG_DIR)
 
 uninstall:
 	sudo rm /usr/local/bin/pindd

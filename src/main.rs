@@ -8,7 +8,7 @@ static BINDINGS: OnceLock<Arc<Vec<(AttributeSet<KeyCode>, String)>>> = OnceLock:
 
 fn get_bindings() -> Arc<Vec<(AttributeSet<KeyCode>, String)>>
 {
-    BINDINGS.get_or_init(|| Arc::new(load_config(CONFIG))).clone()
+    Arc::clone(BINDINGS.get_or_init(|| Arc::new(load_config(CONFIG))))
 }
 
 fn error(title: &str, message: &str) -> !
@@ -20,14 +20,14 @@ fn error(title: &str, message: &str) -> !
 fn run(command: &str, user: &str)
 {
     let shell = var("SHELL").unwrap_or_else(|_| "sh".into());
-    Command::new("runuser")
+    if let Err(e) = Command::new("runuser")
         .args(["-u", user, "--", &shell, "-c", command])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .spawn()
-        .unwrap_or_else(|e| error("Command execution failed", &e.to_string()));
+        .spawn() { error("Command execution failed", &e.to_string()) }
 }
+
 
 fn key_to_keycode(input: &str) -> AttributeSet<KeyCode> 
 {
@@ -161,7 +161,7 @@ fn load_config(config: &str) -> Vec<(AttributeSet<KeyCode>, String)>
 
 fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, user: String)
 {
-    let mut state: Vec<(u64, u64)> = vec![(0, 0); kc.len()];
+    let mut state = vec![(0, 0); kc.len()];
     let mut tick = 1;
     let init = (320 + delay - 1) / delay;
     
@@ -174,43 +174,27 @@ fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, u
     // First, get all supported keys from the physical device to set up the virtual device properly
     let supported_keys = match device.supported_keys() {
         Some(keys) => keys,
-        _ => {
-            eprintln!("Failed to get supported keys from device");
-            return;
-        }
+        _ => return eprintln!("Failed to get supported keys from device")
     };
     
     let mut virtual_device = match VirtualDevice::builder() {
         Ok(builder) => builder,
-        Err(e) => {
-            eprintln!("Failed to create virtual device builder: {}", e);
-            return;
-        }
+        Err(e) => return eprintln!("Failed to create virtual device builder: {e}")
     };
     
-    virtual_device = match virtual_device
-        .name("pind-virtual-keyboard")
-        .with_keys(&supported_keys)
-    {
+    virtual_device = match virtual_device.name("pind-virtual-keyboard").with_keys(&supported_keys) {
         Ok(builder) => builder,
-        Err(e) => {
-            eprintln!("Failed to set up virtual device with keys: {}", e);
-            return;
-        }
+        Err(e) => return eprintln!("Failed to set up virtual device with keys: {e}")
     };
     
     let mut virtual_device = match virtual_device.build() {
         Ok(dev) => dev,
-        Err(e) => {
-            eprintln!("Failed to build virtual device: {}", e);
-            return;
-        }
+        Err(e) => return eprintln!("Failed to build virtual device: {e}")
     };
     
     // Grab the physical device to capture all events
     if let Err(e) = device.grab() {
-        eprintln!("Failed to grab device: {}", e);
-        return;
+        return eprintln!("Failed to grab device: {e}");
     }
 
     loop {
@@ -273,12 +257,10 @@ fn read_keys(kc: &[(AttributeSet<KeyCode>, String)], kbs: PathBuf, delay: u64, u
                 events_to_forward.push(event);
             }
         }
-        if !events_to_forward.is_empty() {
-            if let Err(e) = virtual_device.emit(&events_to_forward) {
-                eprintln!("Failed to emit events: {}", e);
-            }
+        if !events_to_forward.is_empty() && let Err(e) = virtual_device.emit(&events_to_forward) {
+                eprintln!("Failed to emit events: {e}");
         }
-        
+
         thread::sleep(std::time::Duration::from_millis(delay));
         tick = tick.wrapping_add(1);
     }

@@ -1,5 +1,5 @@
-ctrl + shift +up                  =>   light -A 10 ; notify-send "Light" "Light Up %$(light)"
-Ctrl_left + shiFt + uP            =>   doas light -U 10 ; notify-send "Light" "Light Down %$(light)"
+ctrl + shift +up                  =>   doas light -A 10 ; notify-send "Light" "Light Up %$(light)"
+Ctrl_left + shiFt + Down          =>   doas light -U 10 ; notify-send "Light" "Light Down %$(light)"
 meTa_right + a                    =>   set file (ls ~/learn/book | wmenu); and test -n "$file"; and zathura ~/learn/book/"$file"
 Ctrl_left + shift_right + right   =>   pactl set-sink-volume @DEFAULT_SINK@ +10% ; notify-send "Sound" "Volume Up %$(pamixer --get-volume)"
 ctrl+ shift+left                  =>   pactl set-sink-volume @DEFAULT_SINK@ -10% ; notify-send "Sound" "Volume Down %$(pamixer --get-volume)"
